@@ -166,7 +166,7 @@ export class SarcFile {
 
     private static readName(data: Buffer, offset: number) {
         const end = data.indexOf(0, offset);
-        return data.slice(offset, end).toString();
+        return data.subarray(offset, end).toString();
     }
 
     private parseFileNodes(data: Buffer, nodeOffset: number, nodeCount: number, nameTableOffset: number, dataOffset: number) {

@@ -259,7 +259,7 @@ function getDataAlignment(data: Buffer, defaultAlignment: number): number {
 function getFileAlignmentForNewBinaryFile(data: Buffer): number {
     if (data.length <= 0x20) return 0;
 
-    const bom = data.slice(0xC, 0xC + 2).toString();
+    const bom = data.subarray(0xC, 0xC + 2).toString();
     if (bom !== '\xFF\xFE' && bom !== '\xFE\xFF') return 0;
 
     const isLittleEndian = bom === '\xFF\xFE';
