@@ -19,7 +19,7 @@ abstract class Section {
         const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
         const dv = new DataView(dest.buffer, dest.byteOffset, dest.byteLength);
-        return little ? dv.setUint16(offset, value, true) : dv.setUint16(offset, value, false);
+        return dv.setUint16(offset, value, little);
     }
 
     protected writeUInt32(value: number, offset: number = 0, buffer?: Uint8Array, isLittleEndian?: boolean) {
@@ -27,7 +27,7 @@ abstract class Section {
         const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
         const dv = new DataView(dest.buffer, dest.byteOffset, dest.byteLength);
-        return little ? dv.setUint32(offset, value, true) : dv.setUint32(offset, value, false);
+        return dv.setUint32(offset, value, little);
     }
 
 }
@@ -279,7 +279,7 @@ function getFileAlignmentForNewBinaryFile(data: Uint8Array): number {
 
     const isLittleEndian = bom === '\xFF\xFE';
     const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const fileSize = isLittleEndian ? dv.getUint32(0x1C, true) : dv.getUint32(0x1C, false);
+    const fileSize = dv.getUint32(0x1C, isLittleEndian);
     if (data.length !== fileSize) {
         return 0;
     }

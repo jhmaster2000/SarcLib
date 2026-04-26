@@ -88,7 +88,7 @@ export class SarcFile {
     /**
      * Return whether the SARC archive is little endian.
      *
-     * @returns {boolean} `true` if little, `false` if big
+     * @returns `true` if little, `false` if big
      */
     getIsLittleEndian(): boolean {
         return this.isLittleEndian;
@@ -105,12 +105,12 @@ export class SarcFile {
 
     private readUInt16(buffer: Uint8Array, offset: number = 0) {
         const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        return this.isLittleEndian ? dv.getUint16(offset, true) : dv.getUint16(offset, false);
+        return dv.getUint16(offset, this.isLittleEndian);
     }
 
     private readUInt32(buffer: Uint8Array, offset: number = 0) {
         const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        return this.isLittleEndian ? dv.getUint32(offset, true) : dv.getUint32(offset, false);
+        return dv.getUint32(offset, this.isLittleEndian);
     }
 
     private static readName(data: Uint8Array, offset: number): string {
@@ -221,7 +221,7 @@ export class SarcFile {
      * Save current SARC archive to a `Uint8Array`.
      *
      * @param compression what Yaz0 compression level to use. `0`: no compression (fastest), `9`: best compression (slowest)
-     * @returns {} the output file `Uint8Array`
+     * @returns the output file `Uint8Array`
      */
     save(compression: number = 0): Uint8Array {
         // File preparations ------------------------------------------
