@@ -1,10 +1,9 @@
 {
     "type": "module",
-    "name": "@themezernx/sarclib",
-    "version": "1.0.2",
+    "name": "sarclib-ng",
+    "version": "1.1.2",
     "description": "A library for packing and unpacking SARC/SZS archives.",
-    "repository": "https://github.com/ThemezerNX/SarcLib.git",
-    "author": "Migush",
+    "author": "Migush, jhmaster",
     "license": "GPL-3.0-or-later",
     "private": false,
     "module": "./dist/index.js",
