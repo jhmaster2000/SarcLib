@@ -2,24 +2,25 @@
  https://github.com/kinnay/Nintendo-File-Formats/wiki/SARC-File-Format
  Based on SarcLib by MasterVermilli0n/AboodXD and sarc by zeldamods/leoetlino
  */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { FileEntry } from './FileEntry.js';
+import { alignUp, FileDataSection, hashFileName, SARCSection, SFATSection, SFNTSection } from './Sections.js';
+import { compressYaz0, decompressYaz0 } from '@themezernx/yaz0lib';
 
-import * as fs from "fs";
-import * as path from "path";
-import {FileEntry} from "./FileEntry";
-import {alignUp, FileDataSection, hashFileName, SARCSection, SFATSection, SFNTSection} from "./Sections";
-import {compressYaz0, decompressYaz0} from "@themezernx/yaz0lib/dist";
-
-const {join} = require("path");
-const {readdir} = require("fs").promises;
-
-async function* getFiles(dir) {
-    const dirents = await readdir(dir, {withFileTypes: true});
+async function* getFiles(dir: string): AsyncGenerator<{
+    path: string;
+    data: Buffer<ArrayBuffer>;
+}, void, unknown> {
+    const dirents = await readdir(dir, { withFileTypes: true });
     for (const dirent of dirents) {
         const res = join(dir, dirent.name);
         if (dirent.isDirectory()) {
             yield* getFiles(res);
         } else {
-            yield {path: res, data: fs.readFileSync(res)};
+            yield { path: res, data: fs.readFileSync(res) };
         }
     }
 }
@@ -71,7 +72,7 @@ export class SarcFile {
      * @param filePath the path to the file you want to add
      * @param destinationFilePath e.g. `image.jpg`, or `extra/image.jpg`
      */
-    addFileFromPath(filePath: string, destinationFilePath: string = "") {
+    addFileFromPath(filePath: string, destinationFilePath: string = '') {
         const data = fs.readFileSync(filePath);
         this.entries.push(new FileEntry(data, destinationFilePath || path.basename(filePath)));
     }
@@ -86,11 +87,11 @@ export class SarcFile {
      * @param folderPath the path to the folder you want to add
      * @param destinationFolderName e.g. `images`, or `extra/images`
      */
-    async addFolderContentsFromPath(folderPath: string, destinationFolderName: string = "") {
+    async addFolderContentsFromPath(folderPath: string, destinationFolderName: string = '') {
         for await (const f of getFiles(folderPath)) {
             const fileName = f.path
-                .replace(folderPath, "") // remove common base paths
-                .replace(/^[\\\/]+|[\\\/]+$/g, ""); // trim slashes
+                .replace(folderPath, '') // remove common base paths
+                .replace(/^[\\/]+|[\\/]+$/g, ''); // trim slashes
             this.entries.push(new FileEntry(f.data, path.join(destinationFolderName, fileName)));
         }
     }
@@ -120,7 +121,7 @@ export class SarcFile {
      */
     setDefaultAlignment(value: number) {
         if (value === 0 || (value & Number((value - 1) !== 0)) >>> 0) {
-            throw new Error("Alignment must be a non-zero power of 2");
+            throw new Error('Alignment must be a non-zero power of 2');
         }
         this.defaultAlignment = value;
     }
@@ -170,23 +171,23 @@ export class SarcFile {
     }
 
     private parseFileNodes(data: Buffer, nodeOffset: number, nodeCount: number, nameTableOffset: number, dataOffset: number) {
-        let nodes: Array<FileEntry> = [];
+        const nodes: Array<FileEntry> = [];
 
         let offset = nodeOffset;
         for (let i = 0; i < nodeCount; i++) {
             const nameHash = this.readUInt32(data, offset);
             const nameId = this.readUInt32(data, offset + 4);
-            const _hasFilename = nameId >>> 24;
+            //const _hasFilename = nameId >>> 24;
             const nameOffset = (nameId & 0xffffff) >>> 0;
             const fileDataBegin = this.readUInt32(data, offset + 8) + dataOffset;
             const fileDataEnd = this.readUInt32(data, offset + 0xc) + dataOffset;
 
             if (nameId == 0) {
-                throw new Error("Unnamed files are not supported");
+                throw new Error('Unnamed files are not supported');
             }
             const absNameOffset = nameTableOffset + 4 * nameOffset;
             if (absNameOffset > dataOffset) {
-                throw new Error("Invalid name offset for 0x" + nameHash.toString(16));
+                throw new Error('Invalid name offset for 0x' + nameHash.toString(16));
             }
 
             const name = SarcFile.readName(data, absNameOffset);
@@ -208,7 +209,8 @@ export class SarcFile {
         let decompressed = data;
         try {
             decompressed = decompressYaz0(decompressed);
-        } catch (e) {
+        } catch {
+            // suppress error
         }
 
         // This mirrors what the official library does when reading an archive
@@ -216,52 +218,52 @@ export class SarcFile {
 
         // Parse the SARC header.
         if (decompressed.subarray(0x00, 0x04).toString() != SARCSection.magic) {
-            throw new Error("Unknown SARC magic");
+            throw new Error('Unknown SARC magic');
         }
         const bom = decompressed.subarray(0x06, 0x08);
         this.isLittleEndian = bom[0] == 0xFF && bom[1] == 0xFE;
         if (!this.isLittleEndian && !(bom[0] == 0xFE && bom[1] == 0xFF)) {
-            throw new Error("Invalid BOM");
+            throw new Error('Invalid BOM');
         }
         const version = this.readUInt16(decompressed, 0x10);
         if (version != SARCSection.version) {
-            throw new Error("Unknown SARC version");
+            throw new Error('Unknown SARC version');
         }
         const sarcHeaderSize = this.readUInt16(decompressed, 0x4);
         if (sarcHeaderSize != SARCSection.headerSize) {
-            throw new Error("Unexpected SARC header size");
+            throw new Error('Unexpected SARC header size');
         }
 
         // Parse the SFAT header.
         const sfatHeaderOffset = sarcHeaderSize;
         if (decompressed.subarray(sfatHeaderOffset, sfatHeaderOffset + 4).toString() != SFATSection.magic) {
-            throw new Error("Unknown SFAT magic");
+            throw new Error('Unknown SFAT magic');
         }
         const sfatHeaderSize = this.readUInt16(decompressed, sfatHeaderOffset + 4);
         if (sfatHeaderSize != SFATSection.headerSize) {
-            throw new Error("Unexpected SFAT header size");
+            throw new Error('Unexpected SFAT header size');
         }
         const nodeCount = this.readUInt16(decompressed, sfatHeaderOffset + 6);
         const nodeOffset = sarcHeaderSize + sfatHeaderSize;
         if ((nodeCount >>> 0xe) != 0) {
-            throw new Error("Too many entries");
+            throw new Error('Too many entries');
         }
 
         // Parse the SFNT header.
         const sfntHeaderOffset = nodeOffset + 0x10 * nodeCount;
         if (decompressed.subarray(sfntHeaderOffset, sfntHeaderOffset + 4).toString() != SFNTSection.magic) {
-            throw new Error("Unknown SFNT magic");
+            throw new Error('Unknown SFNT magic');
         }
         const sfntHeaderSize = this.readUInt16(decompressed, sfntHeaderOffset + 4);
         if (sfntHeaderSize != SFNTSection.headerSize) {
-            throw new Error("Unexpected SFNT header size");
+            throw new Error('Unexpected SFNT header size');
         }
         const nameTableOffset = sfntHeaderOffset + sfntHeaderSize;
 
         // Check the data offset.
         const dataOffset = this.readUInt32(decompressed, 0xc);
         if (dataOffset < nameTableOffset) {
-            throw new Error("File data should not be stored before the name table");
+            throw new Error('File data should not be stored before the name table');
         }
 
         this.entries = this.parseFileNodes(decompressed, nodeOffset, nodeCount, nameTableOffset, dataOffset);
@@ -289,16 +291,17 @@ export class SarcFile {
         const hashedList: { [name: number]: FileEntry } = {};
 
         for (const file of this.entries) {
-            file.name = file.name.replace(/[\\\/]+/gm, "/");
+            file.name = file.name.replace(/[\\/]+/gm, '/');
             hashedList[hashFileName(file.name, this.hashMultiplier)] = file;
         }
 
         const sortedFlatList = Object.keys(hashedList).sort().reduce(
             (obj, key) => {
-                obj[key] = hashedList[key];
+                const keyn = key as unknown as keyof typeof hashedList;
+                obj[keyn] = hashedList[keyn]!;
                 return obj;
             },
-            {},
+            {} as typeof hashedList,
         );
         const sortedHashes = Object.keys(sortedFlatList);
 
@@ -316,7 +319,7 @@ export class SarcFile {
         const fileData = new FileDataSection(this.isLittleEndian);
 
         for (const hash of sortedHashes) {
-            const file = hashedList[hash];
+            const file = hashedList[Number(hash)]!;
             const alignment = sfat.addFile(Number(hash), file);
             sfnt.addFile(file);
             fileData.addFile(file, alignment);
@@ -339,7 +342,7 @@ export class SarcFile {
         sarc.setFileSize(totalFileLength);
         sarc.setDataOffset(dataStartOffset);
 
-        let outputBuffer = Buffer.concat([
+        let outputBuffer: Buffer = Buffer.concat([
             sarc.getBuffer(),
             sfatBuffer,
             sfntBuffer,
@@ -360,8 +363,8 @@ export class SarcFile {
      * @param compression what Yaz0 compression level to use. `0`: no compression (fastest), `9`: best compression (slowest)
      * @returns {string} full output file path
      */
-    saveTo(filePath: string, compression: number = 0) {
-        const finalPath = path.resolve(filePath + (!/\.[^\/.]+$/.test(filePath) ? (compression != 0 ? ".szs" : ".sarc") : ""));
+    saveTo(filePath: string, compression: number = 0): string {
+        const finalPath = path.resolve(filePath + (!/\.[^/.]+$/.test(filePath) ? (compression != 0 ? '.szs' : '.sarc') : ''));
 
         fs.writeFileSync(finalPath, this.save(compression));
 
@@ -375,16 +378,13 @@ export class SarcFile {
      */
     extractTo(destDir: string) {
         for (const file of this.entries) {
-            const filePath = destDir.replace(/[\\\/]$/, "") + "/" + file.name;
+            const filePath = destDir.replace(/[\\/]$/, '') + '/' + file.name;
             try {
-                fs.mkdirSync(path.dirname(filePath), {recursive: true});
-            } catch (e) {
+                fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            } catch {
                 // do nothing
             }
             fs.writeFileSync(filePath, file.data);
         }
     }
-
 }
-
-
