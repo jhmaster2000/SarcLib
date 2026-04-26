@@ -7,7 +7,7 @@ import path from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { FileEntry } from './FileEntry.js';
 import { alignUp, FileDataSection, hashFileName, SARCSection, SFATSection, SFNTSection } from './Sections.js';
-import { compressYaz0, decompressYaz0 } from '@themezernx/yaz0lib';
+import { compressYaz0, decompressYaz0 } from 'yaz0lib-ng';
 
 async function* getFiles(dir: string): AsyncGenerator<{
     path: string;
