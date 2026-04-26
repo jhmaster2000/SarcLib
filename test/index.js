@@ -1,17 +1,19 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { SarcFile } from '../dist/index.js';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-const sarcBig = new SarcFile(false);
-
-await sarcBig.addFolderContentsFromPath(path.resolve('Psl-8.0.0'));
-
-sarcBig.saveTo(path.join(__dirname, 'Psl-8.0.0.decompressed.szs'));
+const SARC_DIR = path.join(__dirname, 'dv_Yougan_2_extracted');
+fs.rmSync(SARC_DIR, { recursive: true, force: true });
 
 const readSarc = new SarcFile();
+readSarc.loadFrom(path.join(__dirname, 'dv_Yougan_2.szs'));
+readSarc.extractTo(SARC_DIR);
 
-readSarc.loadFrom(path.join(__dirname, 'Psl-8.0.0.decompressed.szs'));
-readSarc.extractTo(path.join(__dirname, 'Psl-8.0.0.decompressed'));
+const sarcBig = new SarcFile();
+await sarcBig.addFolderContentsFromPath(SARC_DIR);
+sarcBig.saveTo(path.join(__dirname, 'dv_Yougan_2_resaved.sarc'));
+sarcBig.saveTo(path.join(__dirname, 'dv_Yougan_2_resaved.szs'), 9);
 
 console.log('Done!');
