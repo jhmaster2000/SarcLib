@@ -9,6 +9,7 @@ export default defineConfig([
     tseslint.configs.recommended,
     unicorn.configs.recommended,
     { rules: {
+        eqeqeq: 'error',
         quotes: ['error', 'single'],
         'unicorn/number-literal-case': ['error', { hexadecimalValue: 'uppercase' }],
         'unicorn/filename-case': 'off',

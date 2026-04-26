@@ -181,7 +181,7 @@ export class SarcFile {
             const fileDataBegin = this.readUInt32(data, offset + 8) + dataOffset;
             const fileDataEnd = this.readUInt32(data, offset + 0xC) + dataOffset;
 
-            if (nameId == 0) {
+            if (nameId === 0) {
                 throw new Error('Unnamed files are not supported');
             }
             const absNameOffset = nameTableOffset + 4 * nameOffset;
@@ -216,45 +216,45 @@ export class SarcFile {
         // (sead::SharcArchiveRes::prepareArchive_)
 
         // Parse the SARC header.
-        if (decompressed.subarray(0x00, 0x04).toString() != SARCSection.magic) {
+        if (decompressed.subarray(0x00, 0x04).toString() !== SARCSection.magic) {
             throw new Error('Unknown SARC magic');
         }
         const bom = decompressed.subarray(0x06, 0x08);
-        this.isLittleEndian = bom[0] == 0xFF && bom[1] == 0xFE;
-        if (!this.isLittleEndian && !(bom[0] == 0xFE && bom[1] == 0xFF)) {
+        this.isLittleEndian = bom[0] === 0xFF && bom[1] === 0xFE;
+        if (!this.isLittleEndian && !(bom[0] === 0xFE && bom[1] === 0xFF)) {
             throw new Error('Invalid BOM');
         }
         const version = this.readUInt16(decompressed, 0x10);
-        if (version != SARCSection.version) {
+        if (version !== SARCSection.version) {
             throw new Error('Unknown SARC version');
         }
         const sarcHeaderSize = this.readUInt16(decompressed, 0x4);
-        if (sarcHeaderSize != SARCSection.headerSize) {
+        if (sarcHeaderSize !== SARCSection.headerSize) {
             throw new Error('Unexpected SARC header size');
         }
 
         // Parse the SFAT header.
         const sfatHeaderOffset = sarcHeaderSize;
-        if (decompressed.subarray(sfatHeaderOffset, sfatHeaderOffset + 4).toString() != SFATSection.magic) {
+        if (decompressed.subarray(sfatHeaderOffset, sfatHeaderOffset + 4).toString() !== SFATSection.magic) {
             throw new Error('Unknown SFAT magic');
         }
         const sfatHeaderSize = this.readUInt16(decompressed, sfatHeaderOffset + 4);
-        if (sfatHeaderSize != SFATSection.headerSize) {
+        if (sfatHeaderSize !== SFATSection.headerSize) {
             throw new Error('Unexpected SFAT header size');
         }
         const nodeCount = this.readUInt16(decompressed, sfatHeaderOffset + 6);
         const nodeOffset = sarcHeaderSize + sfatHeaderSize;
-        if ((nodeCount >>> 0xE) != 0) {
+        if ((nodeCount >>> 0xE) !== 0) {
             throw new Error('Too many entries');
         }
 
         // Parse the SFNT header.
         const sfntHeaderOffset = nodeOffset + 0x10 * nodeCount;
-        if (decompressed.subarray(sfntHeaderOffset, sfntHeaderOffset + 4).toString() != SFNTSection.magic) {
+        if (decompressed.subarray(sfntHeaderOffset, sfntHeaderOffset + 4).toString() !== SFNTSection.magic) {
             throw new Error('Unknown SFNT magic');
         }
         const sfntHeaderSize = this.readUInt16(decompressed, sfntHeaderOffset + 4);
-        if (sfntHeaderSize != SFNTSection.headerSize) {
+        if (sfntHeaderSize !== SFNTSection.headerSize) {
             throw new Error('Unexpected SFNT header size');
         }
         const nameTableOffset = sfntHeaderOffset + sfntHeaderSize;
@@ -348,7 +348,7 @@ export class SarcFile {
             fileDataBuffer,
         ]);
 
-        if (compression != 0) {
+        if (compression !== 0) {
             outputBuffer = compressYaz0(outputBuffer, sfat.getDataOffsetAlignment(), compression);
         }
 
@@ -363,7 +363,7 @@ export class SarcFile {
      * @returns {string} full output file path
      */
     saveTo(filePath: string, compression: number = 0): string {
-        const finalPath = path.resolve(filePath + (/\.[^/.]+$/.test(filePath) ? '' : (compression == 0 ? '.sarc' : '.szs')));
+        const finalPath = path.resolve(filePath + (/\.[^/.]+$/.test(filePath) ? '' : (compression === 0 ? '.sarc' : '.szs')));
 
         fs.writeFileSync(finalPath, this.save(compression));
 

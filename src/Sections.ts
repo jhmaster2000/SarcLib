@@ -15,7 +15,7 @@ abstract class Section {
     abstract getBuffer(): Buffer;
 
     protected writeUInt16(value: number, offset?: number, buffer?: Buffer, isLittleEndian?: boolean) {
-        const little = isLittleEndian == undefined ? this.isLittleEndian : isLittleEndian;
+        const little = isLittleEndian === undefined ? this.isLittleEndian : isLittleEndian;
         const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
         return little ?
@@ -25,7 +25,7 @@ abstract class Section {
     
     
     protected writeUInt32(value: number, offset?: number, buffer?: Buffer, isLittleEndian?: boolean) {
-        const little = isLittleEndian == undefined ? this.isLittleEndian : isLittleEndian;
+        const little = isLittleEndian === undefined ? this.isLittleEndian : isLittleEndian;
         const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
         return little ?
@@ -260,11 +260,11 @@ function getFileAlignmentForNewBinaryFile(data: Buffer): number {
     if (data.length <= 0x20) return 0;
 
     const bom = data.slice(0xC, 0xC + 2).toString();
-    if (bom != '\xFF\xFE' && bom != '\xFE\xFF') return 0;
+    if (bom !== '\xFF\xFE' && bom !== '\xFE\xFF') return 0;
 
-    const isLittleEndian = bom == '\xFF\xFE';
+    const isLittleEndian = bom === '\xFF\xFE';
     const fileSize = isLittleEndian ? data.readUInt32LE(0x1C) : data.readUInt32BE(0x1C);
-    if (data.length != fileSize) {
+    if (data.length !== fileSize) {
         return 0;
     }
     return 1 << data[0xE]!;
