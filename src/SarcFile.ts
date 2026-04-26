@@ -3,9 +3,8 @@
  Based on SarcLib by MasterVermilli0n/AboodXD and sarc by zeldamods/leoetlino
  */
 import * as fs from 'node:fs';
-import * as path from 'node:path';
+import path from 'node:path';
 import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { FileEntry } from './FileEntry.js';
 import { alignUp, FileDataSection, hashFileName, SARCSection, SFATSection, SFNTSection } from './Sections.js';
 import { compressYaz0, decompressYaz0 } from '@themezernx/yaz0lib';
@@ -16,7 +15,7 @@ async function* getFiles(dir: string): AsyncGenerator<{
 }, void, unknown> {
     const dirents = await readdir(dir, { withFileTypes: true });
     for (const dirent of dirents) {
-        const res = join(dir, dirent.name);
+        const res = path.join(dir, dirent.name);
         if (dirent.isDirectory()) {
             yield* getFiles(res);
         } else {
@@ -91,7 +90,7 @@ export class SarcFile {
         for await (const f of getFiles(folderPath)) {
             const fileName = f.path
                 .replace(folderPath, '') // remove common base paths
-                .replace(/^[\\/]+|[\\/]+$/g, ''); // trim slashes
+                .replaceAll(/^[\\/]+|[\\/]+$/g, ''); // trim slashes
             this.entries.push(new FileEntry(f.data, path.join(destinationFolderName, fileName)));
         }
     }
@@ -178,9 +177,9 @@ export class SarcFile {
             const nameHash = this.readUInt32(data, offset);
             const nameId = this.readUInt32(data, offset + 4);
             //const _hasFilename = nameId >>> 24;
-            const nameOffset = (nameId & 0xffffff) >>> 0;
+            const nameOffset = (nameId & 0xFFFFFF) >>> 0;
             const fileDataBegin = this.readUInt32(data, offset + 8) + dataOffset;
-            const fileDataEnd = this.readUInt32(data, offset + 0xc) + dataOffset;
+            const fileDataEnd = this.readUInt32(data, offset + 0xC) + dataOffset;
 
             if (nameId == 0) {
                 throw new Error('Unnamed files are not supported');
@@ -245,7 +244,7 @@ export class SarcFile {
         }
         const nodeCount = this.readUInt16(decompressed, sfatHeaderOffset + 6);
         const nodeOffset = sarcHeaderSize + sfatHeaderSize;
-        if ((nodeCount >>> 0xe) != 0) {
+        if ((nodeCount >>> 0xE) != 0) {
             throw new Error('Too many entries');
         }
 
@@ -261,7 +260,7 @@ export class SarcFile {
         const nameTableOffset = sfntHeaderOffset + sfntHeaderSize;
 
         // Check the data offset.
-        const dataOffset = this.readUInt32(decompressed, 0xc);
+        const dataOffset = this.readUInt32(decompressed, 0xC);
         if (dataOffset < nameTableOffset) {
             throw new Error('File data should not be stored before the name table');
         }
@@ -291,7 +290,7 @@ export class SarcFile {
         const hashedList: { [name: number]: FileEntry } = {};
 
         for (const file of this.entries) {
-            file.name = file.name.replace(/[\\/]+/gm, '/');
+            file.name = file.name.replaceAll(/[\\/]+/gm, '/');
             hashedList[hashFileName(file.name, this.hashMultiplier)] = file;
         }
 
@@ -364,7 +363,7 @@ export class SarcFile {
      * @returns {string} full output file path
      */
     saveTo(filePath: string, compression: number = 0): string {
-        const finalPath = path.resolve(filePath + (!/\.[^/.]+$/.test(filePath) ? (compression != 0 ? '.szs' : '.sarc') : ''));
+        const finalPath = path.resolve(filePath + (/\.[^/.]+$/.test(filePath) ? '' : (compression == 0 ? '.sarc' : '.szs')));
 
         fs.writeFileSync(finalPath, this.save(compression));
 

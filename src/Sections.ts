@@ -15,8 +15,8 @@ abstract class Section {
     abstract getBuffer(): Buffer;
 
     protected writeUInt16(value: number, offset?: number, buffer?: Buffer, isLittleEndian?: boolean) {
-        const little = isLittleEndian != undefined ? isLittleEndian : this.isLittleEndian;
-        const dest = buffer ? buffer : this.buffer;
+        const little = isLittleEndian == undefined ? this.isLittleEndian : isLittleEndian;
+        const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
         return little ?
         dest.writeUInt16LE(value, offset) :
@@ -25,8 +25,8 @@ abstract class Section {
     
     
     protected writeUInt32(value: number, offset?: number, buffer?: Buffer, isLittleEndian?: boolean) {
-        const little = isLittleEndian != undefined ? isLittleEndian : this.isLittleEndian;
-        const dest = buffer ? buffer : this.buffer;
+        const little = isLittleEndian == undefined ? this.isLittleEndian : isLittleEndian;
+        const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
         return little ?
             dest.writeUInt32LE(value, offset) :
@@ -94,7 +94,7 @@ export class SFATSection extends Section {
 
         this.writeUInt32(this.dataOffset, 0x8, entry);
         this.dataOffset += file.data.length;
-        this.writeUInt32(this.dataOffset, 0xc, entry);
+        this.writeUInt32(this.dataOffset, 0xC, entry);
         this.nameOffset += alignUp(Buffer.from(file.name).length + 1, 4);
 
         this.fileBuffers.push(entry);
@@ -197,9 +197,9 @@ export class FileDataSection extends Section {
 
 export function hashFileName(name: string, multiplier: number): number {
     let result = 0;
-    new TextEncoder().encode(name).forEach((byte) => {
+    for (const byte of new TextEncoder().encode(name)) {
         result = ((result * multiplier + byte) & 0xFFFFFFFF) >>> 0;
-    });
+    }
     return result;
 }
 
@@ -259,13 +259,13 @@ function getDataAlignment(data: Buffer, defaultAlignment: number): number {
 function getFileAlignmentForNewBinaryFile(data: Buffer): number {
     if (data.length <= 0x20) return 0;
 
-    const bom = data.slice(0xc, 0xc + 2).toString();
-    if (bom != '\xff\xfe' && bom != '\xfe\xff') return 0;
+    const bom = data.slice(0xC, 0xC + 2).toString();
+    if (bom != '\xFF\xFE' && bom != '\xFE\xFF') return 0;
 
-    const isLittleEndian = bom == '\xff\xfe';
-    const fileSize = isLittleEndian ? data.readUInt32LE(0x1c) : data.readUInt32BE(0x1c);
+    const isLittleEndian = bom == '\xFF\xFE';
+    const fileSize = isLittleEndian ? data.readUInt32LE(0x1C) : data.readUInt32BE(0x1C);
     if (data.length != fileSize) {
         return 0;
     }
-    return 1 << data[0xe]!;
+    return 1 << data[0xE]!;
 }
