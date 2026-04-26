@@ -1,14 +1,17 @@
-const path = require("path");
-const {SarcFile} = require("../dist");
+import path from 'node:path';
+import { SarcFile } from '../dist/index.js';
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const sarcBig = new SarcFile(false);
 
-sarcBig.addFolderContentsFromPath(path.resolve("Psl-8.0.0")).then(()=> {
-    sarcBig.saveTo(path.join(__dirname, "Psl-8.0.0.decompressed.szs"));
+await sarcBig.addFolderContentsFromPath(path.resolve('Psl-8.0.0'));
 
-    const readSarc = new SarcFile();
-        readSarc.loadFrom(path.join(__dirname, "Psl-8.0.0.decompressed.szs"))
-        readSarc.extractTo(path.join(__dirname, "Psl-8.0.0.decompressed"))
-})
+sarcBig.saveTo(path.join(__dirname, 'Psl-8.0.0.decompressed.szs'));
 
-console.log("Done!");
+const readSarc = new SarcFile();
+
+readSarc.loadFrom(path.join(__dirname, 'Psl-8.0.0.decompressed.szs'));
+readSarc.extractTo(path.join(__dirname, 'Psl-8.0.0.decompressed'));
+
+console.log('Done!');

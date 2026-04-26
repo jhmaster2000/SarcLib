@@ -26,6 +26,6 @@ export default defineConfig([
                 projectService: true,
             },
         },
-        ignores: ['eslint.config.js'],
+        ignores: ['eslint.config.js', 'test/*'],
     }
 ]);
