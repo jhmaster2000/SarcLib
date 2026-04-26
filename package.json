@@ -25,6 +25,18 @@
         "dist/"
     ],
     "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "browser": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "default": {
+                "types": "./dist/node.d.ts",
+                "default": "./dist/node.js"
+            }
+        }
+    },
     "dependencies": {
         "yaz0lib-ng": "file:../Yaz0Lib"
     }

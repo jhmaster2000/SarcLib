@@ -3,13 +3,13 @@ export class FileEntry {
      * Name may include slashes. This will be treated as folder structure.
      */
     name: string;
-    data: Buffer;
+    data: Uint8Array;
 
     /**
-     * @param data raw file `Buffer`
+     * @param data raw file `Uint8Array`
      * @param name e.g. `image.jpg`, or `extra/image.jpg`
      */
-    constructor(data: Buffer = Buffer.alloc(0), name: string) {
+    constructor(data: Uint8Array = new Uint8Array(0), name: string) {
         this.name = name;
         this.data = data;
     }

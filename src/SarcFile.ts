@@ -2,27 +2,9 @@
  https://github.com/kinnay/Nintendo-File-Formats/wiki/SARC-File-Format
  Based on SarcLib by MasterVermilli0n/AboodXD and sarc by zeldamods/leoetlino
  */
-import * as fs from 'node:fs';
-import path from 'node:path';
-import { readdir } from 'node:fs/promises';
 import { FileEntry } from './FileEntry.js';
 import { alignUp, FileDataSection, hashFileName, SARCSection, SFATSection, SFNTSection } from './Sections.js';
 import { compressYaz0, decompressYaz0 } from 'yaz0lib-ng';
-
-async function* getFiles(dir: string): AsyncGenerator<{
-    path: string;
-    data: Buffer<ArrayBuffer>;
-}, void, unknown> {
-    const dirents = await readdir(dir, { withFileTypes: true });
-    for (const dirent of dirents) {
-        const res = path.join(dir, dirent.name);
-        if (dirent.isDirectory()) {
-            yield* getFiles(res);
-        } else {
-            yield { path: res, data: fs.readFileSync(res) };
-        }
-    }
-}
 
 export class SarcFile {
 
@@ -57,42 +39,11 @@ export class SarcFile {
      * Add a file to this SARC archive.
      * In order to 'put' it in a folder, use a custom `destinationFilePath`
      *
-     * @param data raw file `Buffer`
+     * @param data raw file `Uint8Array`
      * @param destinationFilePath e.g. `image.jpg`, or `extra/image.jpg`
      */
-    addRawFile(data: Buffer, destinationFilePath: string) {
+    addRawFile(data: Uint8Array, destinationFilePath: string) {
         this.entries.push(new FileEntry(data, destinationFilePath));
-    }
-
-    /**
-     * Add a file to the SARC archive.
-     * In order to 'put' it in a folder, use a custom `destinationFilePath`
-     *
-     * @param filePath the path to the file you want to add
-     * @param destinationFilePath e.g. `image.jpg`, or `extra/image.jpg`
-     */
-    addFileFromPath(filePath: string, destinationFilePath: string = '') {
-        const data = fs.readFileSync(filePath);
-        this.entries.push(new FileEntry(data, destinationFilePath || path.basename(filePath)));
-    }
-
-    /**
-     * Add all files inside a folder to the SARC archive (recursively).
-     * Notes:
-     * - the contents of this folder are stored in the root of the SARC: the folder itself is not included.
-     * - empty directories are skipped
-     * In order to 'put' the contents in a folder, use a custom `destinationFolderPath`
-     *
-     * @param folderPath the path to the folder you want to add
-     * @param destinationFolderName e.g. `images`, or `extra/images`
-     */
-    async addFolderContentsFromPath(folderPath: string, destinationFolderName: string = '') {
-        for await (const f of getFiles(folderPath)) {
-            const fileName = f.path
-                .replace(folderPath, '') // remove common base paths
-                .replaceAll(/^[\\/]+|[\\/]+$/g, ''); // trim slashes
-            this.entries.push(new FileEntry(f.data, path.join(destinationFolderName, fileName)));
-        }
     }
 
     /**
@@ -152,24 +103,22 @@ export class SarcFile {
         this.isLittleEndian = isLittleEndian;
     }
 
-    private readUInt16(buffer: Buffer, offset?: number) {
-        return this.isLittleEndian ?
-            buffer.readUInt16LE(offset) :
-            buffer.readUInt16BE(offset);
+    private readUInt16(buffer: Uint8Array, offset: number = 0) {
+        const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        return this.isLittleEndian ? dv.getUint16(offset, true) : dv.getUint16(offset, false);
     }
 
-    private readUInt32(buffer: Buffer, offset?: number) {
-        return this.isLittleEndian ?
-            buffer.readUInt32LE(offset) :
-            buffer.readUInt32BE(offset);
+    private readUInt32(buffer: Uint8Array, offset: number = 0) {
+        const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        return this.isLittleEndian ? dv.getUint32(offset, true) : dv.getUint32(offset, false);
     }
 
-    private static readName(data: Buffer, offset: number) {
+    private static readName(data: Uint8Array, offset: number): string {
         const end = data.indexOf(0, offset);
-        return data.subarray(offset, end).toString();
+        return new TextDecoder().decode(data.subarray(offset, end));
     }
 
-    private parseFileNodes(data: Buffer, nodeOffset: number, nodeCount: number, nameTableOffset: number, dataOffset: number) {
+    private parseFileNodes(data: Uint8Array, nodeOffset: number, nodeCount: number, nameTableOffset: number, dataOffset: number) {
         const nodes: Array<FileEntry> = [];
 
         let offset = nodeOffset;
@@ -201,10 +150,10 @@ export class SarcFile {
      * Load and parse a SARC archive.
      * File may be compressed with Yaz0.
      *
-     * @param data the raw sarc file data `Buffer`
+     * @param data the raw sarc file data `Uint8Array`
      * @throws Error if the SARC archive is invalid or unsupported
      */
-    load(data: Buffer) {
+    load(data: Uint8Array) {
         let decompressed = data;
         try {
             decompressed = decompressYaz0(decompressed);
@@ -216,7 +165,7 @@ export class SarcFile {
         // (sead::SharcArchiveRes::prepareArchive_)
 
         // Parse the SARC header.
-        if (decompressed.subarray(0x00, 0x04).toString() !== SARCSection.magic) {
+        if (new TextDecoder().decode(decompressed.subarray(0x00, 0x04)) !== SARCSection.magic) {
             throw new Error('Unknown SARC magic');
         }
         const bom = decompressed.subarray(0x06, 0x08);
@@ -235,7 +184,7 @@ export class SarcFile {
 
         // Parse the SFAT header.
         const sfatHeaderOffset = sarcHeaderSize;
-        if (decompressed.subarray(sfatHeaderOffset, sfatHeaderOffset + 4).toString() !== SFATSection.magic) {
+        if (new TextDecoder().decode(decompressed.subarray(sfatHeaderOffset, sfatHeaderOffset + 4)) !== SFATSection.magic) {
             throw new Error('Unknown SFAT magic');
         }
         const sfatHeaderSize = this.readUInt16(decompressed, sfatHeaderOffset + 4);
@@ -250,7 +199,7 @@ export class SarcFile {
 
         // Parse the SFNT header.
         const sfntHeaderOffset = nodeOffset + 0x10 * nodeCount;
-        if (decompressed.subarray(sfntHeaderOffset, sfntHeaderOffset + 4).toString() !== SFNTSection.magic) {
+        if (new TextDecoder().decode(decompressed.subarray(sfntHeaderOffset, sfntHeaderOffset + 4)) !== SFNTSection.magic) {
             throw new Error('Unknown SFNT magic');
         }
         const sfntHeaderSize = this.readUInt16(decompressed, sfntHeaderOffset + 4);
@@ -269,23 +218,12 @@ export class SarcFile {
     }
 
     /**
-     * Load and parse a SARC archive.
-     * File may be compressed with Yaz0.
-     *
-     * @param filePath the sarc file path.
-     * @throws Error if the SARC archive is invalid, unsupported, or not found
-     */
-    loadFrom(filePath: string) {
-        this.load(fs.readFileSync(filePath));
-    }
-
-    /**
-     * Save current SARC archive to a `Buffer`.
+     * Save current SARC archive to a `Uint8Array`.
      *
      * @param compression what Yaz0 compression level to use. `0`: no compression (fastest), `9`: best compression (slowest)
-     * @returns {} the output file `Buffer`
+     * @returns {} the output file `Uint8Array`
      */
-    save(compression: number = 0): Buffer {
+    save(compression: number = 0): Uint8Array {
         // File preparations ------------------------------------------
         const hashedList: { [name: number]: FileEntry } = {};
 
@@ -341,7 +279,7 @@ export class SarcFile {
         sarc.setFileSize(totalFileLength);
         sarc.setDataOffset(dataStartOffset);
 
-        let outputBuffer: Buffer = Buffer.concat([
+        let outputBuffer = concatUint8([
             sarc.getBuffer(),
             sfatBuffer,
             sfntBuffer,
@@ -356,34 +294,25 @@ export class SarcFile {
     }
 
     /**
-     * Save current SARC archive to file.
+     * Extract all SARC archive contents to an in-memory map.
      *
-     * @param filePath the save destination. Will use `.szs` (compressed) or `.sarc` (uncompressed) if no file extension was provided.
-     * @param compression what Yaz0 compression level to use. `0`: no compression (fastest), `9`: best compression (slowest)
-     * @returns {string} full output file path
+     * @returns Map of filepath -> Uint8Array
      */
-    saveTo(filePath: string, compression: number = 0): string {
-        const finalPath = path.resolve(filePath + (/\.[^/.]+$/.test(filePath) ? '' : (compression === 0 ? '.sarc' : '.szs')));
-
-        fs.writeFileSync(finalPath, this.save(compression));
-
-        return finalPath;
-    }
-
-    /**
-     * Extract all SARC archive contents to a directory.
-     *
-     * @param destDir the destination directory path
-     */
-    extractTo(destDir: string) {
+    extract(): Map<string, Uint8Array> {
+        const out = new Map<string, Uint8Array>();
         for (const file of this.entries) {
-            const filePath = destDir.replace(/[\\/]$/, '') + '/' + file.name;
-            try {
-                fs.mkdirSync(path.dirname(filePath), { recursive: true });
-            } catch {
-                // do nothing
-            }
-            fs.writeFileSync(filePath, file.data);
+            out.set(file.name, file.data);
         }
+        return out;
     }
+}
+
+// helper used by save to concatenate Uint8Arrays
+function concatUint8(arrs: Uint8Array[]): Uint8Array {
+    let total = 0;
+    for (const a of arrs) total += a.length;
+    const out = new Uint8Array(total);
+    let pos = 0;
+    for (const a of arrs) { out.set(a, pos); pos += a.length; }
+    return out;
 }

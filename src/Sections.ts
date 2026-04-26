@@ -1,8 +1,8 @@
 import { FileEntry } from './FileEntry.js';
 
 abstract class Section {
-    private isLittleEndian;
-    protected buffer?: Buffer;
+    private isLittleEndian: boolean;
+    protected buffer?: Uint8Array;
 
     constructor(isLittleEndian: boolean = false) {
         this.isLittleEndian = isLittleEndian;
@@ -12,27 +12,33 @@ abstract class Section {
         this.isLittleEndian = isLittleEndian;
     }
 
-    abstract getBuffer(): Buffer;
+    abstract getBuffer(): Uint8Array;
 
-    protected writeUInt16(value: number, offset?: number, buffer?: Buffer, isLittleEndian?: boolean) {
+    protected writeUInt16(value: number, offset: number = 0, buffer?: Uint8Array, isLittleEndian?: boolean) {
         const little = isLittleEndian === undefined ? this.isLittleEndian : isLittleEndian;
         const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
-        return little ?
-        dest.writeUInt16LE(value, offset) :
-        dest.writeUInt16BE(value, offset);
+        const dv = new DataView(dest.buffer, dest.byteOffset, dest.byteLength);
+        return little ? dv.setUint16(offset, value, true) : dv.setUint16(offset, value, false);
     }
-    
-    
-    protected writeUInt32(value: number, offset?: number, buffer?: Buffer, isLittleEndian?: boolean) {
+
+    protected writeUInt32(value: number, offset: number = 0, buffer?: Uint8Array, isLittleEndian?: boolean) {
         const little = isLittleEndian === undefined ? this.isLittleEndian : isLittleEndian;
         const dest = buffer ?? this.buffer;
         if (dest === undefined) throw new Error('no buffer');
-        return little ?
-            dest.writeUInt32LE(value, offset) :
-            dest.writeUInt32BE(value, offset);
+        const dv = new DataView(dest.buffer, dest.byteOffset, dest.byteLength);
+        return little ? dv.setUint32(offset, value, true) : dv.setUint32(offset, value, false);
     }
 
+}
+
+function concatUint8(arrs: Uint8Array[]) {
+    let total = 0;
+    for (const a of arrs) total += a.length;
+    const out = new Uint8Array(total);
+    let pos = 0;
+    for (const a of arrs) { out.set(a, pos); pos += a.length; }
+    return out;
 }
 
 export class SARCSection extends Section {
@@ -43,13 +49,14 @@ export class SARCSection extends Section {
     private fileSize?: number;
     private dataOffset?: number;
 
-    getBuffer(): Buffer {
+    getBuffer(): Uint8Array {
         if (this.fileSize === undefined) throw new Error('SARCSection.getBuffer called before setFileSize');
         if (this.dataOffset === undefined) throw new Error('SARCSection.getBuffer called before setDataOffset');
 
-        this.buffer = Buffer.alloc(SARCSection.headerSize);
+        this.buffer = new Uint8Array(SARCSection.headerSize);
 
-        this.buffer.write(SARCSection.magic);
+        const enc = new TextEncoder();
+        this.buffer.set(enc.encode(SARCSection.magic), 0);
         this.writeUInt16(SARCSection.headerSize, 0x4);
         this.writeUInt16(SARCSection.endianConst, 0x6);
         this.writeUInt32(this.fileSize, 0x8);
@@ -75,7 +82,7 @@ export class SFATSection extends Section {
     public static readonly headerSize = 0xC;
     public static readonly entrySize = 0x10;
     private hashMultiplier = 0x65;
-    private fileBuffers: Buffer[] = [];
+    private fileBuffers: Uint8Array[] = [];
 
     private defaultAlignment = 0x04;
     private nameOffset = 0;
@@ -83,7 +90,7 @@ export class SFATSection extends Section {
     private dataOffsetAlignment = 1;
 
     addFile(hash: number, file: FileEntry): number {
-        const entry = Buffer.alloc(SFATSection.entrySize);
+        const entry = new Uint8Array(SFATSection.entrySize);
 
         this.writeUInt32(hash, 0x0, entry);
         this.writeUInt32(0x01000000 | (this.nameOffset >>> 2), 0x4, entry);
@@ -95,22 +102,23 @@ export class SFATSection extends Section {
         this.writeUInt32(this.dataOffset, 0x8, entry);
         this.dataOffset += file.data.length;
         this.writeUInt32(this.dataOffset, 0xC, entry);
-        this.nameOffset += alignUp(Buffer.from(file.name).length + 1, 4);
+        this.nameOffset += alignUp(new TextEncoder().encode(file.name).length + 1, 4);
 
         this.fileBuffers.push(entry);
 
         return alignment;
     }
 
-    getBuffer(): Buffer {
-        this.buffer = Buffer.alloc(SFATSection.headerSize);
+    getBuffer(): Uint8Array {
+        this.buffer = new Uint8Array(SFATSection.headerSize);
 
-        this.buffer.write(SFATSection.magic);
+        const enc = new TextEncoder();
+        this.buffer.set(enc.encode(SFATSection.magic), 0);
         this.writeUInt16(SFATSection.headerSize, 0x4);
         this.writeUInt16(this.fileBuffers.length, 0x6);
         this.writeUInt32(this.hashMultiplier, 0x8);
 
-        return Buffer.concat([this.buffer, ...this.fileBuffers]);
+        return concatUint8([this.buffer, ...this.fileBuffers]);
     }
 
     setHashMultiplier(multiplier: number) {
@@ -131,31 +139,33 @@ export class SFNTSection extends Section {
     static readonly magic = 'SFNT';
     public static readonly headerSize = 0x8;
 
-    private fileBuffers: Buffer[] = [];
+    private fileBuffers: Uint8Array[] = [];
 
     addFile(file: FileEntry) {
-        const roundedUpLength = alignUp(Buffer.from(file.name).length + 1, 4);
-        const entry = Buffer.alloc(roundedUpLength);
+        const nameBytes = new TextEncoder().encode(file.name);
+        const roundedUpLength = alignUp(nameBytes.length + 1, 4);
+        const entry = new Uint8Array(roundedUpLength);
 
-        entry.write(file.name);
+        entry.set(nameBytes, 0);
 
         this.fileBuffers.push(entry);
     }
 
-    getBuffer(): Buffer {
-        this.buffer = Buffer.alloc(SFNTSection.headerSize);
+    getBuffer(): Uint8Array {
+        this.buffer = new Uint8Array(SFNTSection.headerSize);
 
-        this.buffer.write(SFNTSection.magic);
+        const enc = new TextEncoder();
+        this.buffer.set(enc.encode(SFNTSection.magic), 0);
         this.writeUInt16(SFNTSection.headerSize, 0x4);
         this.writeUInt16(0, 0x6);
 
-        return Buffer.concat([this.buffer, ...this.fileBuffers]);
+        return concatUint8([this.buffer, ...this.fileBuffers]);
     }
 
 }
 
 export class FileDataSection extends Section {
-    private fileBuffers: Buffer[] = [];
+    private fileBuffers: Uint8Array[] = [];
     private sectionSize = 0;
 
     private dataOffsetAlignment?: number;
@@ -165,8 +175,9 @@ export class FileDataSection extends Section {
         const totalFileLength = alignUp(this.sectionSize, alignment);
         const padding = totalFileLength - this.sectionSize;
 
-        const entry = Buffer.concat([
-            Buffer.alloc(padding),
+        const pad = new Uint8Array(padding);
+        const entry = concatUint8([
+            pad,
             file.data,
         ]);
 
@@ -174,13 +185,13 @@ export class FileDataSection extends Section {
         this.fileBuffers.push(entry);
     }
 
-    getBuffer(): Buffer {
+    getBuffer(): Uint8Array {
         if (this.cursorPosition === undefined) throw new Error('FileDataSection.getBuffer called before setCursorPosition');
         if (this.dataOffsetAlignment === undefined) throw new Error('FileDataSection.getBuffer called before setDataOffsetAlignment');
 
         const dataPadding = alignUpAsPadding(this.cursorPosition, this.dataOffsetAlignment);
-        return Buffer.concat([
-            Buffer.alloc(dataPadding),
+        return concatUint8([
+            new Uint8Array(dataPadding),
             ...this.fileBuffers,
         ]);
     }
@@ -211,59 +222,64 @@ function alignUpAsPadding(n: number, alignment: number): number {
     return (alignment - (n % alignment)) % alignment;
 }
 
-function getDataAlignment(data: Buffer, defaultAlignment: number): number {
-    if (data.toString('ascii', 0, 4) === 'SARC') {
+function readAscii(slice: Uint8Array) {
+    return new TextDecoder().decode(slice);
+}
+
+function getDataAlignment(data: Uint8Array, defaultAlignment: number): number {
+    if (readAscii(data.subarray(0, 4)) === 'SARC') {
         return 0x2000; // SARC archive
-    } else if (data.toString('ascii', 0, 4) === 'Yaz0') {
+    } else if (readAscii(data.subarray(0, 4)) === 'Yaz0') {
         return 0x80; // Yaz0 compressed archive
-    } else if (data.toString('ascii', 0, 4) === 'FFNT') {
+    } else if (readAscii(data.subarray(0, 4)) === 'FFNT') {
         return 0x2000; // Wii U/Switch Binary font
-    } else if (data.toString('ascii', 0, 4) === 'CFNT') {
+    } else if (readAscii(data.subarray(0, 4)) === 'CFNT') {
         return 0x80; // 3DS Binary font
     } else if (
-        data.toString('ascii', 0, 4) === 'CSTM' ||
-        data.toString('ascii', 0, 4) === 'FSTM' ||
-        data.toString('ascii', 0, 4) === 'FSTP' ||
-        data.toString('ascii', 0, 4) === 'CWAV' ||
-        data.toString('ascii', 0, 4) === 'FWAV'
+        readAscii(data.subarray(0, 4)) === 'CSTM' ||
+        readAscii(data.subarray(0, 4)) === 'FSTM' ||
+        readAscii(data.subarray(0, 4)) === 'FSTP' ||
+        readAscii(data.subarray(0, 4)) === 'CWAV' ||
+        readAscii(data.subarray(0, 4)) === 'FWAV'
     ) {
         return 0x20; // Audio data
     } else if (
-        data.toString('ascii', 0, 4) === 'BNTX' ||
-        data.toString('ascii', 0, 4) === 'BNSH' ||
-        data.toString('ascii', 0, 8) === 'FSHA    '
+        readAscii(data.subarray(0, 4)) === 'BNTX' ||
+        readAscii(data.subarray(0, 4)) === 'BNSH' ||
+        readAscii(data.subarray(0, 8)) === 'FSHA    '
     ) {
         return 0x1000; // Switch GPU data
-    } else if (data.toString('ascii', 0, 4) === 'Gfx2' || data.toString('ascii', -0x28, -0x24) === 'FLIM') {
+    } else if (readAscii(data.subarray(0, 4)) === 'Gfx2' || readAscii(data.subarray(-0x28, -0x24)) === 'FLIM') {
         return 0x2000; // Wii U GPU data and Wii U/Switch Binary Resources
-    } else if (data.toString('ascii', 0, 4) === 'CTPK') {
+    } else if (readAscii(data.subarray(0, 4)) === 'CTPK') {
         return 0x10; // 3DS Texture package
-    } else if (data.toString('ascii', 0, 4) === 'CGFX' || data.toString('ascii', -0x28, -0x24) === 'CLIM') {
+    } else if (readAscii(data.subarray(0, 4)) === 'CGFX' || readAscii(data.subarray(-0x28, -0x24)) === 'CLIM') {
         return 0x80; // 3DS Layout image and Binary Resources
-    } else if (data.toString('ascii', 0, 4) === 'AAMP') {
+    } else if (readAscii(data.subarray(0, 4)) === 'AAMP') {
         return 8; // Environment settings
     } else if (
-        data.toString('ascii', 0, 2) === 'YB' ||
-        data.toString('ascii', 0, 2) === 'BY' ||
-        data.toString('ascii', 0, 8) === 'MsgStdBn' ||
-        data.toString('ascii', 0, 8) === 'MsgPrjBn'
+        readAscii(data.subarray(0, 2)) === 'YB' ||
+        readAscii(data.subarray(0, 2)) === 'BY' ||
+        readAscii(data.subarray(0, 8)) === 'MsgStdBn' ||
+        readAscii(data.subarray(0, 8)) === 'MsgPrjBn'
     ) {
         return 0x80;  // Binary text
-    } else if (data.toString('ascii', 0xC, 0x10) === 'SCDL') {
+    } else if (readAscii(data.subarray(0xC, 0x10)) === 'SCDL') {
         return 0x100; // SMM2 Course data
     }
 
     return Math.max(defaultAlignment, getFileAlignmentForNewBinaryFile(data));
 }
 
-function getFileAlignmentForNewBinaryFile(data: Buffer): number {
+function getFileAlignmentForNewBinaryFile(data: Uint8Array): number {
     if (data.length <= 0x20) return 0;
 
-    const bom = data.subarray(0xC, 0xC + 2).toString();
+    const bom = readAscii(data.subarray(0xC, 0xC + 2));
     if (bom !== '\xFF\xFE' && bom !== '\xFE\xFF') return 0;
 
     const isLittleEndian = bom === '\xFF\xFE';
-    const fileSize = isLittleEndian ? data.readUInt32LE(0x1C) : data.readUInt32BE(0x1C);
+    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const fileSize = isLittleEndian ? dv.getUint32(0x1C, true) : dv.getUint32(0x1C, false);
     if (data.length !== fileSize) {
         return 0;
     }
