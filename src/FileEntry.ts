@@ -1,5 +1,4 @@
 export class FileEntry {
-
     /**
      * Name may include slashes. This will be treated as folder structure.
      */
@@ -10,9 +9,8 @@ export class FileEntry {
      * @param data raw file `Buffer`
      * @param name e.g. `image.jpg`, or `extra/image.jpg`
      */
-    constructor(data: Buffer = Buffer.alloc(0), name) {
+    constructor(data: Buffer = Buffer.alloc(0), name: string) {
         this.name = name;
         this.data = data;
     }
-
 }
