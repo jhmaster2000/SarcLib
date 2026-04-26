@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { SarcFile } from '../dist/index.js';
+import { SarcFile } from '../dist/node.js';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
