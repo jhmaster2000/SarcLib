@@ -249,7 +249,13 @@ function getDataAlignment(data: Uint8Array, defaultAlignment: number): number {
         readAscii(data.subarray(0, 8)) === 'FSHA    '
     ) {
         return 0x1000; // Switch GPU data
-    } else if (readAscii(data.subarray(0, 4)) === 'Gfx2' || readAscii(data.subarray(-0x28, -0x24)) === 'FLIM') {
+    } else if (
+        readAscii(data.subarray(0, 4)) === 'Gfx2' ||
+        readAscii(data.subarray(0, 4)) === 'FRES' ||
+        readAscii(data.subarray(0, 4)) === 'AAHS' ||
+        readAscii(data.subarray(0, 4)) === 'BAHS' ||
+        readAscii(data.subarray(-0x28, -0x24)) === 'FLIM'
+    ) {
         return 0x2000; // Wii U GPU data and Wii U/Switch Binary Resources
     } else if (readAscii(data.subarray(0, 4)) === 'CTPK') {
         return 0x10; // 3DS Texture package
